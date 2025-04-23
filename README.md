@@ -18,7 +18,7 @@ CyberRAGLLM is a cybersecurity-focused question-answering system that uses Retri
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/CyberRAGLLM.git
+git clone https://github.com/zetioz/CyberRAGLLM.git
 cd CyberRAGLLM
 ```
 
