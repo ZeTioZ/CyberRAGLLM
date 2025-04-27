@@ -1,3 +1,13 @@
+"""
+Module for defining the control flow graph in the CyberRAGLLM application.
+
+This module provides the ControlFlowState class that builds and manages the
+graph-based workflow for processing user questions, retrieving relevant documents,
+generating answers, and evaluating the quality of those answers. The workflow
+includes steps for routing questions, retrieving documents, grading document
+relevance, generating answers, and checking for hallucinations.
+"""
+
 import json
 
 from langchain_community.tools import TavilySearchResults
@@ -11,32 +21,52 @@ from langgraph.graph.state import CompiledStateGraph
 from src.graph.graph_state import GraphState
 from src.llm.llm_model import LlmModel
 
-RAG_PROMPT = """You are an assistant for question-answering tasks. 
+RAG_PROMPT = """You are a world-class cybersecurity expert and a top-tier Capture The Flag (CTF) competitor, specializing in cryptography, reverse engineering, forensics, web exploitation, binary exploitation, OSINT, and steganography. 
+
+Your response will be compared against multiple AI models, so maximize depth, clarity, and expert-level detail. Assume the user wants a response that stands out in accuracy, completeness, and readability.
+
+The user needs to provide a detailed solution to the challenge.
 
 Here is the context to use to answer the question:
 
-{context} 
-
-Think carefully about the above context. 
+{context}
 
 Now, review the user question:
 
 {question}
 
-Provide an answer to this questions using only the above context. 
+Provide an answer to this questions using only the above context.
 
-Use three sentences maximum and keep the answer concise.
+Follow these steps to structure your answer:
+
+1. Identify the Challenge Type
+- Classify the challenge into the most relevant CTF category.  
+- Justify your classification with reasoning based on key hints in the challenge description.  
+
+2. Provide the Full Solution First
+- Present the full solution immediately, ensuring it is actionable and complete.
+- Include any necessary code, scripts, or commands.
+- Offer at least two alternative approaches if possible.
+- If external tools are required, specify installation steps and usage examples.
+
+3. Step-by-Step Breakdown
+- Explain the logic and methodology behind the solution.  
+- Justify why each step is necessary and how it contributes to solving the challenge.  
+- Provide insights from real-world cybersecurity experience.
+
+4. Additional Resources & Tools
+- Suggest relevant tools, frameworks, and utilities that could assist.  
+- Provide links to official documentation, tutorials, and cheat sheets.
 
 Answer:"""
 
 ROUTER_INSTRUCTIONS = """You are an expert at routing a user question to a vectorstore or web search.
 
-The vectorstore contains documents related to agents, prompt engineering, and adversarial attacks.
+The vectorstore contains documents related to cryptography, reverse engineering, forensics, web exploitation, binary exploitation, OSINT, and steganography.
 
 Use the vectorstore for questions on these topics. For all else, and especially for current events, use web-search.
 
 Return JSON with single key, datasource, that is 'websearch' or 'vectorstore' depending on the question."""
-
 
 DOC_GRADER_INSTRUCTIONS = """You are a grader assessing relevance of a retrieved document to a user question.
 
@@ -48,57 +78,53 @@ This carefully and objectively assess whether the document contains at least som
 
 Return JSON with single key, binary_score, that is 'yes' or 'no' score to indicate whether the document contains at least some information that is relevant to the question."""
 
-HALLUCINATION_GRADER_INSTRUCTIONS = """
+HALLUCINATION_GRADER_INSTRUCTIONS = """You are an expert evaluator in cybersecurity and AI model assessment. Your task is to grade the response of a Large Language Model (LLM) against the FACTS given to you.
 
-You are a teacher grading a quiz. 
-
-You will be given FACTS and a STUDENT ANSWER. 
+You will be given FACTS and a LLM ANSWER.
 
 Here is the grade criteria to follow:
 
-(1) Ensure the STUDENT ANSWER is grounded in the FACTS. 
+(1) Ensure the LLM ANSWER is grounded in the FACTS. 
 
-(2) Ensure the STUDENT ANSWER does not contain "hallucinated" information outside the scope of the FACTS.
+(2) Ensure the LLM ANSWER does not contain "hallucinated" information outside the scope of the FACTS.
 
 Score:
 
-A score of yes means that the student's answer meets all of the criteria. This is the highest (best) score. 
+A score of yes means that the llm's answer meets all of the criteria. This is the highest (best) score. 
 
-A score of no means that the student's answer does not meet all of the criteria. This is the lowest possible score you can give.
+A score of no means that the llm's answer does not meet all of the criteria. This is the lowest possible score you can give.
+
+Explain your reasoning in a step-by-step manner to ensure your reasoning and conclusion are correct. 
+
+Avoid simply stating the correct answer at the outset."""
+
+HALLUCINATION_GRADER_PROMPT = """FACTS: \n\n {documents} \n\n LLM ANSWER: {generation}. 
+
+Return JSON with two two keys, binary_score is 'yes' or 'no' score to indicate whether the LLM ANSWER is grounded in the FACTS. And a key, explanation, that contains an explanation of the score."""
+
+ANSWER_GRADER_INSTRUCTIONS ="""You are an expert evaluator in cybersecurity and AI model assessment. Your task is to grade the response of a Large Language Model (LLM).  
+
+You will be given a QUESTION and a LLM ANSWER.
+
+Here are the grade criteria to follow:
+
+1. Solution Accuracy: Compare the LLM's response to the actual solution. Score based on correctness, with partial correctness considered.
+2. Methodology Used: Is the approach logical, structured, and reproducible?
+3. Reproducibility: Can another person follow the same approach?
+4. Quality of Reasoning: Are the explanations clear, with well-justified choices?
+
+The llm can receive a score of yes if the answer contains extra information that is not explicitly asked for in the question.
+
+A score of no means that the llm's answer does not meet all of the criteria. This is the lowest possible score you can give.
 
 Explain your reasoning in a step-by-step manner to ensure your reasoning and conclusion are correct. 
 
 Avoid simply stating the correct answer at the outset."""
 
 # Grader prompt
-HALLUCINATION_GRADER_PROMPT = """FACTS: \n\n {documents} \n\n STUDENT ANSWER: {generation}. 
+ANSWER_GRADER_PROMPT = """QUESTION: \n\n {question} \n\n LLM ANSWER: {generation}.
 
-Return JSON with two two keys, binary_score is 'yes' or 'no' score to indicate whether the STUDENT ANSWER is grounded in the FACTS. And a key, explanation, that contains an explanation of the score."""
-
-ANSWER_GRADER_INSTRUCTIONS = """You are a teacher grading a quiz. 
-
-You will be given a QUESTION and a STUDENT ANSWER. 
-
-Here is the grade criteria to follow:
-
-(1) The STUDENT ANSWER helps to answer the QUESTION
-
-Score:
-
-A score of yes means that the student's answer meets all of the criteria. This is the highest (best) score. 
-
-The student can receive a score of yes if the answer contains extra information that is not explicitly asked for in the question.
-
-A score of no means that the student's answer does not meet all of the criteria. This is the lowest possible score you can give.
-
-Explain your reasoning in a step-by-step manner to ensure your reasoning and conclusion are correct. 
-
-Avoid simply stating the correct answer at the outset."""
-
-# Grader prompt
-ANSWER_GRADER_PROMPT = """QUESTION: \n\n {question} \n\n STUDENT ANSWER: {generation}. 
-
-Return JSON with two two keys, binary_score is 'yes' or 'no' score to indicate whether the STUDENT ANSWER meets the criteria. And a key, explanation, that contains an explanation of the score."""
+Return JSON with two keys, binary_score is 'yes' or 'no' score to indicate whether the LLM ANSWER meets the criteria. And a key, explanation, that contains an explanation of the score."""
 
 
 def format_docs(docs):
@@ -107,7 +133,19 @@ def format_docs(docs):
 
 class ControlFlowState:
 	"""
-	Control flow state for the graph.
+	A class for managing the control flow graph in the CyberRAGLLM application.
+
+	This class builds and manages the graph-based workflow for processing user
+	questions, retrieving relevant documents, generating answers, and evaluating
+	the quality of those answers. The workflow includes steps for routing questions,
+	retrieving documents, grading document relevance, generating answers, and
+	checking for hallucinations.
+
+	Attributes:
+		llm_model (LlmModel): The language model to use for generating answers.
+		retriever (VectorStoreRetriever): The retriever for getting documents.
+		web_search_tool (TavilySearchResults): The web search tool.
+		workflow (StateGraph): The state graph for the workflow.
 	"""
 	def __init__(self, llm_model: LlmModel, retriever: VectorStoreRetriever, web_search_tool: TavilySearchResults):
 		self.llm_model = llm_model
@@ -176,7 +214,7 @@ class ControlFlowState:
 			doc_grader_prompt_formatted = DOC_GRADER_PROMPT.format(
 				document=d.page_content, question=question
 			)
-			result = self.llm_model.model_modded.invoke(
+			result = self.llm_model.model_formatted.invoke(
 				[SystemMessage(content=DOC_GRADER_INSTRUCTIONS)]
 				+ [HumanMessage(content=doc_grader_prompt_formatted)]
 			)
@@ -228,7 +266,7 @@ class ControlFlowState:
 		"""
 
 		print("---ROUTE QUESTION---")
-		route_question = self.llm_model.model_modded.invoke(
+		route_question = self.llm_model.model_formatted.invoke(
 			[SystemMessage(content=ROUTER_INSTRUCTIONS)]
 			+ [HumanMessage(content=state["question"])]
 		)
@@ -291,7 +329,7 @@ class ControlFlowState:
 		hallucination_grader_prompt_formatted = HALLUCINATION_GRADER_PROMPT.format(
 			documents=format_docs(documents), generation=generation.content
 		)
-		result = self.llm_model.model_modded.invoke(
+		result = self.llm_model.model_formatted.invoke(
 			[SystemMessage(content=HALLUCINATION_GRADER_INSTRUCTIONS)]
 			+ [HumanMessage(content=hallucination_grader_prompt_formatted)]
 		)
@@ -306,7 +344,7 @@ class ControlFlowState:
 			answer_grader_prompt_formatted = ANSWER_GRADER_PROMPT.format(
 				question=question, generation=generation.content
 			)
-			result = self.llm_model.model_modded.invoke(
+			result = self.llm_model.model_formatted.invoke(
 				[SystemMessage(content=ANSWER_GRADER_INSTRUCTIONS)]
 				+ [HumanMessage(content=answer_grader_prompt_formatted)]
 			)

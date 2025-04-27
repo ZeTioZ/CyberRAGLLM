@@ -1,3 +1,12 @@
+"""
+Main module for the CyberRAGLLM application.
+
+This module serves as the entry point for the CyberRAGLLM application, which
+uses a graph-based workflow to answer cybersecurity questions using Retrieval-Augmented
+Generation (RAG) and web search. It initializes the necessary components, builds
+the workflow graph, and handles user interaction.
+"""
+
 import os
 import sys
 
@@ -12,6 +21,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 def main():
 	"""
 	Main function to run the CyberRAGLLM application.
+
+	This function initializes the necessary components for the CyberRAGLLM application,
+	including the language model, web search tool, document processor, and control flow
+	state. It then builds the workflow graph and enters a loop to process user questions.
+
+	The function handles user input, processes the question through the graph-based
+	workflow, and displays the results to the user. It continues processing questions
+	until the user terminates the application.
 	"""
 	print("Welcome to CyberRAGLLM!")
 	print("This application uses a graph-based workflow to answer questions using RAG and web search.")
@@ -26,13 +43,22 @@ def main():
 	# Get user question
 	while True:
 		question = input("Enter your question: ")
+		max_retries_input = input("Enter the maximum number of retries (default is 3): ")
+		if max_retries_input.strip() == "":
+			max_retries_input = 3
+		else:
+			try:
+				max_retries_input = int(max_retries_input)
+			except ValueError:
+				print("Invalid input. Using default value of 3.")
+				max_retries_input = 3
 
 		# Initialize state
 		state = {
 			"question": question,
 			"documents": [],
 			"web_search": "No",
-			"max_retries": 3,
+			"max_retries": max_retries_input,
 			"loop_step": 0,
 			"generation": "",
 			"answers": 0
@@ -50,8 +76,6 @@ def main():
 		# Print additional information if available
 		if 'documents' in result:
 			print(f"\nBased on {len(result['documents'])} documents")
-
-	return result
 
 if __name__ == "__main__":
 	main()

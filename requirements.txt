@@ -8,4 +8,5 @@ langchain_ollama
 scikit-learn
 langgraph
 tavily-python
-bs4
+beautifulsoup4
+requests
