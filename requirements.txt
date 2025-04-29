@@ -10,3 +10,6 @@ langgraph
 tavily-python
 beautifulsoup4
 requests
+fastapi
+uvicorn
+pydantic

@@ -33,9 +33,9 @@ def main():
 	print("Welcome to CyberRAGLLM!")
 	print("This application uses a graph-based workflow to answer questions using RAG and web search.")
 
-	llm_model = LlmModel("llama3.2:3b-instruct-fp16", "json")
+	llm_model = LlmModel("hf.co/safe049/mistral-v0.3-7b-cybersecurity:latest", "json")
 	web_search_tool = TavilySearch().web_search_tool
-	document_processor = DocumentProcessor(urls=open("../rag_urls.txt").read().splitlines(), model="sentence-transformers/all-mpnet-base-v2")
+	document_processor = DocumentProcessor(urls=open("../rag_urls.txt").read().splitlines(), model="intfloat/multilingual-e5-large-instruct")
 	retriever = document_processor.get_retriever()
 	control_flow_state = ControlFlowState(llm_model, retriever, web_search_tool)
 	graph = control_flow_state.build_graph()
@@ -72,7 +72,8 @@ def main():
 		print("\n=== Result ===")
 		print(f"Question: {question}")
 		print(f"Answer: {result.get('generation', 'No answer generated.')}")
-
+		# Print the actual answer content if available
+		print(f"Answer content: {result.get('generation', 'No answer content available.').text()}")
 		# Print additional information if available
 		if 'documents' in result:
 			print(f"\nBased on {len(result['documents'])} documents")
