@@ -9,6 +9,7 @@ relevance, generating answers, and checking for hallucinations.
 """
 
 import json
+import re
 
 from langchain_community.tools import TavilySearchResults
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -21,42 +22,46 @@ from langgraph.graph.state import CompiledStateGraph
 from src.graph.graph_state import GraphState
 from src.llm.llm_model import LlmModel
 
-RAG_PROMPT = """You are a world-class cybersecurity expert and a top-tier Capture The Flag (CTF) competitor, specializing in cryptography, reverse engineering, forensics, web exploitation, binary exploitation, OSINT, and steganography. 
+RAG_PROMPT = """You are a world-class cybersecurity expert, a top-tier Capture The Flag (CTF) competitor, and a domain expert in cryptography, reverse engineering, forensics, web exploitation, binary exploitation, OSINT, steganography, and general cybersecurity.
 
-Your response will be compared against multiple AI models, so maximize depth, clarity, and expert-level detail. Assume the user wants a response that stands out in accuracy, completeness, and readability.
+However, you are also an elite general-purpose problem solver, capable of answering a wide range of questions — including simple general-knowledge or everyday questions — with accuracy and clarity.
 
-The user needs to provide a detailed solution to the challenge.
+Your response will be compared against multiple AI models, so maximize depth, clarity, and expert-level detail when appropriate.
 
 Here is the context to use to answer the question:
 
 {context}
 
-Now, review the user question:
+Now, review the user input:
 
 {question}
 
-Provide an answer to this questions using only the above context.
+Instructions:
 
-Follow these steps to structure your answer:
+If the question is a general or simple knowledge question (e.g., “What’s the sky color?” or “Who is the president of France?”), provide a direct, concise, clear answer without unnecessary formatting or technical breakdown.
 
-1. Identify the Challenge Type
-- Classify the challenge into the most relevant CTF category.  
-- Justify your classification with reasoning based on key hints in the challenge description.  
+If the input is a cybersecurity challenge, technical question, or detailed problem, follow the structured expert format below.
+
+Structured Expert Format (for technical or complex inputs):
+
+1️. Identify the Question Type
+- Classify the input into the most relevant category (e.g., CTF challenge, cybersecurity problem, technical question).
+- Justify your classification based on key hints in the input.
 
 2. Provide the Full Solution First
-- Present the full solution immediately, ensuring it is actionable and complete.
-- Include any necessary code, scripts, or commands.
+- Present the complete, actionable solution immediately.
+- Include necessary code, scripts, commands, or examples.
 - Offer at least two alternative approaches if possible.
-- If external tools are required, specify installation steps and usage examples.
+- Specify any required tools, installation steps, and usage.
 
-3. Step-by-Step Breakdown
-- Explain the logic and methodology behind the solution.  
-- Justify why each step is necessary and how it contributes to solving the challenge.  
-- Provide insights from real-world cybersecurity experience.
+3️. Step-by-Step Breakdown
+- Explain the logic and methodology behind the solution.
+- Justify why each step is necessary and how it contributes to solving the problem.
+- Provide insights from real-world experience.
 
-4. Additional Resources & Tools
-- Suggest relevant tools, frameworks, and utilities that could assist.  
-- Provide links to official documentation, tutorials, and cheat sheets.
+4️. Additional Resources & Tools
+- Suggest useful tools, frameworks, and external references.
+- Provide links to official documentation, tutorials, or cheat sheets.
 
 Answer:"""
 
@@ -108,7 +113,7 @@ You will be given a QUESTION and a LLM ANSWER.
 
 Here are the grade criteria to follow:
 
-1. Solution Accuracy: Compare the LLM's response to the actual solution. Score based on correctness, with partial correctness considered.
+1. Solution Accuracy: Score based on correctness, with partial correctness considered.
 2. Methodology Used: Is the approach logical, structured, and reproducible?
 3. Reproducibility: Can another person follow the same approach?
 4. Quality of Reasoning: Are the explanations clear, with well-justified choices?
@@ -130,6 +135,28 @@ Return JSON with two keys, binary_score is 'yes' or 'no' score to indicate wheth
 def format_docs(docs):
 	return "\n\n".join(doc.page_content for doc in docs)
 
+def sanitize_query(query: str) -> str:
+	"""
+	Sanitize a query string to be compatible with Tavily Search.
+
+	This method only sanitizes special characters that might cause issues with the Tavily API,
+	preserving code blocks and other content.
+
+	Args:
+		query (str): The original query string.
+
+	Returns:
+		str: The sanitized query string.
+	"""
+	# Replace special characters that might cause issues
+	query = re.sub(r'[<>{}[\]\\|;`]', ' ', query)
+
+	# Limit query length
+	if len(query) > 1000:
+		query = query[:997] + "..."
+
+	return query
+
 
 class ControlFlowState:
 	"""
@@ -147,15 +174,16 @@ class ControlFlowState:
 		web_search_tool (TavilySearchResults): The web search tool.
 		workflow (StateGraph): The state graph for the workflow.
 	"""
-	def __init__(self, llm_model: LlmModel, retriever: VectorStoreRetriever, web_search_tool: TavilySearchResults):
+	def __init__(self, llm_model: LlmModel, retriever: VectorStoreRetriever, web_search_tool: TavilySearchResults, web_search_enabled: bool = True):
 		self.llm_model = llm_model
 		self.retriever = retriever
 		self.web_search_tool = web_search_tool
+		self.web_search_enabled = web_search_enabled
 		self.workflow = StateGraph(GraphState)
 
 	def retrieve_documents(self, state):
 		"""
-		Retrieve documents from vectorstore
+		Retrieve documents from the vectorstore
 
 		Args:
 			state (dict): The current graph state
@@ -167,6 +195,9 @@ class ControlFlowState:
 		question = state["question"]
 
 		# Write retrieved documents to documents key in state
+		if self.retriever is None:
+			print("No retriever found")
+			return {"documents": []}
 		documents = self.retriever.invoke(question)
 		return {"documents": documents}
 
@@ -228,7 +259,7 @@ class ControlFlowState:
 				print("---GRADE: DOCUMENT NOT RELEVANT---")
 				# We do not include the document in filtered_docs
 				# We set a flag to indicate that we want to run web search
-				web_search = "Yes"
+				web_search = "yes"
 				continue
 		return {"documents": filtered_docs, "web_search": web_search}
 
@@ -248,7 +279,7 @@ class ControlFlowState:
 		documents = state.get("documents", [])
 
 		# Web search
-		docs = self.web_search_tool.invoke({"query": question})
+		docs = self.web_search_tool.invoke({"query": sanitize_query(question)})
 		web_results = "\n".join([d["content"] for d in docs if "content" in d])
 		web_results = Document(page_content=web_results)
 		documents.append(web_results)
@@ -266,6 +297,12 @@ class ControlFlowState:
 		"""
 
 		print("---ROUTE QUESTION---")
+
+		# If web search is disabled, always route to vectorstore
+		if not self.web_search_enabled:
+			print("---WEB SEARCH DISABLED, ROUTING TO RAG---")
+			return "vectorstore"
+
 		route_question = self.llm_model.model_formatted.invoke(
 			[SystemMessage(content=ROUTER_INSTRUCTIONS)]
 			+ [HumanMessage(content=state["question"])]
@@ -290,13 +327,18 @@ class ControlFlowState:
 			state (dict): The current graph state
 
 		Returns:
-			str: Binary decision for next node to call
+			str: Binary decision for the next node to call
 		"""
 
 		print("---ASSESS GRADED DOCUMENTS---")
 		web_search = state["web_search"]
 
-		if web_search == "Yes":
+		# If web search is disabled, always generate
+		if not self.web_search_enabled:
+			print("---WEB SEARCH DISABLED, PROCEEDING TO GENERATE---")
+			return "generate"
+
+		if web_search.lower() == "yes":
 			# All documents have been filtered check_relevance
 			# We will re-generate a new query
 			print(
@@ -354,6 +396,10 @@ class ControlFlowState:
 				return "useful"
 			elif state["loop_step"] <= max_retries:
 				print("---DECISION: GENERATION DOES NOT ADDRESS QUESTION---")
+				# If web search is disabled, don't route to web search
+				if not self.web_search_enabled:
+					print("---WEB SEARCH DISABLED, TRYING AGAIN WITH EXISTING DOCUMENTS---")
+					return "not supported"
 				return "not useful"
 			else:
 				print("---DECISION: MAX RETRIES REACHED---")

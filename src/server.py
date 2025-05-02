@@ -35,6 +35,7 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: Optional[int] = None
     stream: Optional[bool] = False
     max_retries: Optional[int] = 3
+    web_search_enabled: Optional[bool] = True
 
 class ChatCompletionChoice(BaseModel):
     index: int
@@ -66,13 +67,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize components
-llm_model = LlmModel("hf.co/safe049/mistral-v0.3-7b-cybersecurity:latest", "json")
+# Initialize shared components
+llm_model = LlmModel("hf.co/wahidmounir/SenecaLLM_x_Qwen2.5-7B-CyberSecurity-Q8_0-GGUF:latest", "json")
 web_search_tool = TavilySearch().web_search_tool
-document_processor = DocumentProcessor(urls=open("rag_urls.txt").read().splitlines(), model="intfloat/multilingual-e5-large-instruct")
+document_processor = DocumentProcessor(urls=open("../rag_urls.txt").read().splitlines(), model="intfloat/multilingual-e5-large-instruct")
 retriever = document_processor.get_retriever()
-control_flow_state = ControlFlowState(llm_model, retriever, web_search_tool)
-graph = control_flow_state.build_graph()
+
+# Function to create a new control flow state with the specified web search setting
+def create_control_flow(web_search_enabled=True):
+    control_flow_state = ControlFlowState(llm_model, retriever, web_search_tool, web_search_enabled)
+    return control_flow_state.build_graph()
 
 @app.get("/")
 async def root():
@@ -89,7 +93,7 @@ async def root():
 async def create_chat_completion(request: ChatCompletionRequest):
     """
     OpenAI-compatible chat completions endpoint.
-    
+
     This endpoint processes chat completion requests in the OpenAI API format,
     runs them through the CyberRAGLLM graph-based workflow, and returns responses
     in the format expected by OpenAI API clients.
@@ -99,9 +103,9 @@ async def create_chat_completion(request: ChatCompletionRequest):
         user_messages = [msg for msg in request.messages if msg.role == "user"]
         if not user_messages:
             raise HTTPException(status_code=400, detail="No user message found in the request")
-        
+
         question = user_messages[-1].content
-        
+
         # Initialize state
         state = {
             "question": question,
@@ -112,14 +116,17 @@ async def create_chat_completion(request: ChatCompletionRequest):
             "generation": "",
             "answers": 0
         }
-        
+
+        # Create a new graph with the specified web search setting
+        graph = create_control_flow(request.web_search_enabled)
+
         # Run the graph
         result = graph.invoke(state)
-        
+
         # Extract the answer
         answer = result.get('generation', 'No answer generated.')
         answer_content = answer.text()
-        
+
         # Create response in OpenAI format
         response = ChatCompletionResponse(
             id=f"chatcmpl-{os.urandom(4).hex()}",
@@ -140,9 +147,9 @@ async def create_chat_completion(request: ChatCompletionRequest):
                 total_tokens=(len(question) + len(answer_content))
             )
         )
-        
+
         return response
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 

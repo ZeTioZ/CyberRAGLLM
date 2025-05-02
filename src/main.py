@@ -37,11 +37,14 @@ def main():
 	web_search_tool = TavilySearch().web_search_tool
 	document_processor = DocumentProcessor(urls=open("../rag_urls.txt").read().splitlines(), model="intfloat/multilingual-e5-large-instruct")
 	retriever = document_processor.get_retriever()
-	control_flow_state = ControlFlowState(llm_model, retriever, web_search_tool)
-	graph = control_flow_state.build_graph()
 
 	# Get user question
 	while True:
+		print("\n=== New Question ===")
+		web_search_enabled_input = input("Enable web search? (y/n): ")
+		web_search_enabled = web_search_enabled_input.lower() == "y"
+		control_flow_state = ControlFlowState(llm_model, retriever, web_search_tool, web_search_enabled)
+		graph = control_flow_state.build_graph()
 		question = input("Enter your question: ")
 		max_retries_input = input("Enter the maximum number of retries (default is 3): ")
 		if max_retries_input.strip() == "":

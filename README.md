@@ -7,8 +7,10 @@ CyberRAGLLM is a cybersecurity-focused question-answering system that uses Retri
 - 🔒 **Cybersecurity Focus**: Specialized for cybersecurity domain with extensive document collection
 - 🤖 **Local LLM Integration**: Works with Ollama-based local LLMs (e.g., Llama 3.2)
 - 📚 **Web Document Processing**: Loads and processes documents from web URLs
+- 📄 **PDF Support**: Processes PDF files from both local paths and internet URLs
 - 🔍 **Vector Search**: Efficient retrieval using SKLearnVectorStore with HuggingFace embeddings
 - 🌐 **Web Search Integration**: Uses Tavily Search API for supplementary information
+- 🔘 **Web Search Toggle**: Ability to enable or disable web searches completely
 - 🧠 **Graph-based Workflow**: Sophisticated control flow for question routing and answer generation
 - 🧐 **Quality Control**: Grades document relevance and answer quality
 - 📊 **Hallucination Detection**: Checks if generated answers are grounded in the retrieved documents
@@ -88,7 +90,44 @@ The system uses URLs listed in `rag_urls.txt` as document sources. You can modif
 ```
 https://example.com/cybersecurity-doc1
 https://example.com/cybersecurity-doc2
+https://example.com/document.pdf
+/path/to/local/document.pdf
 ```
+
+### Using PDF Files
+
+The system can process PDF files from both local paths and internet URLs:
+
+1. **Local PDF Files**: Add the full path to the PDF file in `rag_urls.txt`
+2. **Internet PDF Files**: Add the URL to the PDF file in `rag_urls.txt`
+
+The system automatically detects PDF files based on file extension (.pdf) or content type and processes them accordingly.
+
+### Controlling Web Search
+
+You can enable or disable web searches completely:
+
+1. **API Usage**: When using the API, include the `web_search_enabled` parameter in your request:
+   ```json
+   {
+      "model": "your_model_name",
+      "messages": [
+          { "role": "system", "content": "system_prompt" },
+          { "role": "user", "content": "user_prompt" }
+      ],
+      "web_search_enabled": False,
+      "max_retries": 5,
+      "temperature": 0.7,
+      "max_tokens": -1,
+      "stream": False
+   }
+   ```
+
+2. **Benefits of Disabling Web Search**:
+   - Privacy and security when dealing with sensitive information
+   - Offline mode for environments without internet access
+   - Controlled information to ensure answers are based only on vetted documents
+   - Testing and evaluation to compare answer quality with and without web search
 
 ## System Architecture
 
@@ -112,7 +151,8 @@ CyberRAGLLM uses a graph-based workflow with the following components:
   - scikit-learn
   - tiktoken
   - tavily-python
-  - bs4 (BeautifulSoup)
+  - beautifulsoup4 (BeautifulSoup)
+  - pypdf (for PDF processing)
 - Tavily API key for web search functionality
 - LangSmith API key for tracing (optional)
 - Sufficient RAM for embedding and running the LLM
