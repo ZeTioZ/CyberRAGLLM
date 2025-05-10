@@ -149,30 +149,36 @@ class DocumentProcessor:
 		"""
 		# Load documents using appropriate loaders based on the file type
 		docs = []
+		urls_len = len(self.urls)
+		file_offset = 0
 		for index, url in enumerate(self.urls):
 			url = url.strip()
-			if pathlib.Path(url).is_dir():
+			if os.path.isdir(url):
+				print(f"Loading Directory: {url} ({index+file_offset+1}/{urls_len})")
+				files_in_dir = pathlib.Path(url).glob("*")
+				urls_len += len(list(files_in_dir))
 				for file in pathlib.Path(url).glob("*"):
+					file_offset += 1
 					file_str = file.__str__()
 					if self._is_pdf(file_str):
-						print(f"Loading PDF: {file_str} ({index+1}/{len(self.urls)})")
+						print(f"Loading PDF: {file_str} ({index+file_offset+1}/{urls_len})")
 						docs.append(PDFLoader(file_str).load())
 					elif self._is_text_file(file_str):
-						print(f"Loading text file: {file_str} ({index+1}/{len(self.urls)})")
+						print(f"Loading text file: {file_str} ({index+file_offset+1}/{urls_len})")
 						docs.append(TextLoader(file_str).load())
 					else:
 						print(f"Skipping unsupported file type: {file_str}")
-			if self._is_pdf(url):
+			elif self._is_pdf(url):
 				# Use PDFLoader for PDF files
-				print(f"Loading PDF: {url} ({index+1}/{len(self.urls)})")
+				print(f"Loading PDF: {url} ({index+file_offset+1}/{urls_len})")
 				docs.append(PDFLoader(url).load())
 			elif self._is_text_file(url):
 				# Use TextLoader for text-based files
-				print(f"Loading text file: {url} ({index+1}/{len(self.urls)})")
+				print(f"Loading text file: {url} ({index+file_offset+1}/{urls_len})")
 				docs.append(TextLoader(url).load())
 			else:
 				# Use CustomWebLoader for web content
-				print(f"Loading web content: {url} ({index+1}/{len(self.urls)})")
+				print(f"Loading web content: {url} ({index+file_offset+1}/{urls_len})")
 				docs.append(CustomWebLoader(url).load())
 
 		# Flatten the list of documents
