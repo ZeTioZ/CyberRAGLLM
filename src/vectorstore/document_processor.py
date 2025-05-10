@@ -7,6 +7,8 @@ efficient semantic retrieval.
 """
 
 import os
+import pathlib
+
 import requests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import SKLearnVectorStore
@@ -124,34 +126,13 @@ class DocumentProcessor:
 			bool: True if the path points to a text-based file, False otherwise.
 		"""
 		# List of common text file extensions
-		text_extensions = ['.txt', '.md', '.markdown', '.rst', '.csv', '.json', '.xml', '.html', '.htm']
+		text_extensions = ['.txt', '.md', '.markdown', '.rst', '.csv', '.json', '.xml', '.log', '.cfg', '.ini', '.properties']
 
 		# Check if the path ends with a text file extension (case insensitive)
 		path_lower = path.lower().strip('"')
 		for ext in text_extensions:
 			if path_lower.endswith(ext):
 				return True
-
-		# For URLs, check content type if possible
-		if path.startswith('http://') or path.startswith('https://'):
-			try:
-				headers = requests.head(path, allow_redirects=True).headers
-				content_type = headers.get('Content-Type', '').lower()
-
-				# Check for common text content types
-				text_content_types = ['text/', 'application/json', 'application/xml']
-				for content_type_prefix in text_content_types:
-					if content_type.startswith(content_type_prefix):
-						return True
-
-				# Check content disposition for filename with text extension
-				content_disp = headers.get('Content-Disposition', '').lower()
-				for ext in text_extensions:
-					if ext in content_disp and 'filename' in content_disp:
-						return True
-			except:
-				pass
-
 		return False
 
 	def _process(self) -> VectorStoreRetriever | None:
@@ -169,6 +150,18 @@ class DocumentProcessor:
 		# Load documents using appropriate loaders based on the file type
 		docs = []
 		for index, url in enumerate(self.urls):
+			url = url.strip()
+			if pathlib.Path(url).is_dir():
+				for file in pathlib.Path(url).glob("*"):
+					file_str = file.__str__()
+					if self._is_pdf(file_str):
+						print(f"Loading PDF: {file_str} ({index+1}/{len(self.urls)})")
+						docs.append(PDFLoader(file_str).load())
+					elif self._is_text_file(file_str):
+						print(f"Loading text file: {file_str} ({index+1}/{len(self.urls)})")
+						docs.append(TextLoader(file_str).load())
+					else:
+						print(f"Skipping unsupported file type: {file_str}")
 			if self._is_pdf(url):
 				# Use PDFLoader for PDF files
 				print(f"Loading PDF: {url} ({index+1}/{len(self.urls)})")
