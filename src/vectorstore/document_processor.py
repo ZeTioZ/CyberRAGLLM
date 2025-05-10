@@ -1,11 +1,12 @@
 """
-Module for processing documents from web URLs and PDF files into a vector store for retrieval.
+Module for processing documents from web URLs, PDF files, and text-based files into a vector store for retrieval.
 
-This module provides functionality to load web content and PDF files, split them into chunks,
-embed those chunks using a language model, and create a vector store for
+This module provides functionality to load web content, PDF files, and text-based files (like .md and .txt),
+split them into chunks, embed those chunks using a language model, and create a vector store for
 efficient semantic retrieval.
 """
 
+import os
 import requests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import SKLearnVectorStore
@@ -13,15 +14,20 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_huggingface import HuggingFaceEmbeddings
 from src.vectorstore.custom_web_loader import CustomWebLoader
 from src.vectorstore.pdf_loader import PDFLoader
+from src.vectorstore.text_loader import TextLoader
 
 
 class DocumentProcessor:
 	"""
-	A class for processing web documents and PDF files into a vector store for retrieval.
+	A class for processing web documents, PDF files, and text-based files into a vector store for retrieval.
 
-	This class handles loading web content from URLs and PDF files (both local and from URLs),
+	This class handles loading web content from URLs, PDF files (both local and from URLs),
+	and text-based files like Markdown (.md) and plain text (.txt) files,
 	splitting the content into chunks, embedding those chunks using a language model,
 	and creating a vector store for efficient semantic retrieval.
+
+	This class implements a caching mechanism to ensure documents are only loaded once
+	for the same set of URLs and parameters.
 
 	Attributes:
 		urls (list): List of URLs or file paths to load content from.
@@ -32,6 +38,8 @@ class DocumentProcessor:
 		k (int): Number of documents to retrieve.
 		retriever (VectorStoreRetriever): The retriever for getting documents.
 	"""
+	# Class-level cache to store retrievers for specific configurations
+	_cache = {}
 	def __init__(self, urls: list=None, chunk_size: int=1000, chunk_overlap: int=200, model: str="intfloat/multilingual-e5-large-instruct", inference_mode: str="local", k: int=3):
 		"""
 		Initialize the DocumentProcessor.
@@ -50,7 +58,32 @@ class DocumentProcessor:
 		self.model = model
 		self.inference_mode = inference_mode
 		self.k = k
-		self.retriever = self._process()
+
+		cache_key = self._generate_cache_key()
+		if cache_key in DocumentProcessor._cache:
+			print("Using cached document retriever - skipping document loading")
+			self.retriever = DocumentProcessor._cache[cache_key]
+		else:
+			self.retriever = self._process()
+			DocumentProcessor._cache[cache_key] = self.retriever
+
+	def _generate_cache_key(self):
+		"""
+		Generate a unique cache key based on the current configuration.
+
+		Returns:
+			str: A hash string that uniquely identifies the current configuration.
+		"""
+		sorted_urls = sorted(self.urls) if self.urls else []
+		config = (
+			tuple(sorted_urls),
+			self.chunk_size,
+			self.chunk_overlap,
+			self.model,
+			self.inference_mode,
+			self.k
+		)
+		return str(hash(config))
 
 	def _is_pdf(self, path: str) -> bool:
 		"""
@@ -80,14 +113,55 @@ class DocumentProcessor:
 				pass
 		return False
 
-	def _process(self) -> VectorStoreRetriever:
+	def _is_text_file(self, path: str) -> bool:
+		"""
+		Check if a path or URL points to a text-based file.
+
+		Args:
+			path (str): The path or URL to check.
+
+		Returns:
+			bool: True if the path points to a text-based file, False otherwise.
+		"""
+		# List of common text file extensions
+		text_extensions = ['.txt', '.md', '.markdown', '.rst', '.csv', '.json', '.xml', '.html', '.htm']
+
+		# Check if the path ends with a text file extension (case insensitive)
+		path_lower = path.lower().strip('"')
+		for ext in text_extensions:
+			if path_lower.endswith(ext):
+				return True
+
+		# For URLs, check content type if possible
+		if path.startswith('http://') or path.startswith('https://'):
+			try:
+				headers = requests.head(path, allow_redirects=True).headers
+				content_type = headers.get('Content-Type', '').lower()
+
+				# Check for common text content types
+				text_content_types = ['text/', 'application/json', 'application/xml']
+				for content_type_prefix in text_content_types:
+					if content_type.startswith(content_type_prefix):
+						return True
+
+				# Check content disposition for filename with text extension
+				content_disp = headers.get('Content-Disposition', '').lower()
+				for ext in text_extensions:
+					if ext in content_disp and 'filename' in content_disp:
+						return True
+			except:
+				pass
+
+		return False
+
+	def _process(self) -> VectorStoreRetriever | None:
 		"""
 		Process the URLs and file paths into a vector store retriever.
 
 		This method loads documents from the URLs and file paths, splits them into chunks,
 		embeds the chunks using the specified model, and creates a vector store
-		for efficient retrieval. It automatically detects PDF files and uses the
-		appropriate loader.
+		for efficient retrieval. It automatically detects PDF files, text-based files,
+		and web content, and uses the appropriate loader for each.
 
 		Returns:
 			VectorStoreRetriever: A retriever for getting documents from the vector store.
@@ -97,11 +171,15 @@ class DocumentProcessor:
 		for index, url in enumerate(self.urls):
 			if self._is_pdf(url):
 				# Use PDFLoader for PDF files
-				print(f"Loading PDF: {url}")
+				print(f"Loading PDF: {url} ({index+1}/{len(self.urls)})")
 				docs.append(PDFLoader(url).load())
+			elif self._is_text_file(url):
+				# Use TextLoader for text-based files
+				print(f"Loading text file: {url} ({index+1}/{len(self.urls)})")
+				docs.append(TextLoader(url).load())
 			else:
 				# Use CustomWebLoader for web content
-				print(f"Loading web content: {url}")
+				print(f"Loading web content: {url} ({index+1}/{len(self.urls)})")
 				docs.append(CustomWebLoader(url).load())
 
 		# Flatten the list of documents

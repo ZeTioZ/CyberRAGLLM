@@ -13,7 +13,6 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import uvicorn
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -55,7 +54,16 @@ class ChatCompletionResponse(BaseModel):
     choices: List[ChatCompletionChoice]
     usage: ChatCompletionUsage
 
-# Initialize FastAPI app
+# Initialize shared components
+documents_urls = open("rag_urls.txt").read().splitlines()
+print("Loading documents for the vector store,", len(documents_urls), "documents to load...")
+document_processor = DocumentProcessor(urls=documents_urls, model="intfloat/multilingual-e5-large-instruct")
+retriever = document_processor.get_retriever()
+print("Initializing LLM model and web search tool...")
+llm_model = LlmModel("hf.co/safe049/mistral-v0.3-7b-cybersecurity:latest", "json")
+web_search_tool = TavilySearch().web_search_tool
+
+print("Initializing CyberRAGLLM FastAPI...")
 app = FastAPI(title="CyberRAGLLM API", description="OpenAI-compatible API for CyberRAGLLM")
 
 # Add CORS middleware
@@ -66,12 +74,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize shared components
-llm_model = LlmModel("hf.co/wahidmounir/SenecaLLM_x_Qwen2.5-7B-CyberSecurity-Q8_0-GGUF:latest", "json")
-web_search_tool = TavilySearch().web_search_tool
-document_processor = DocumentProcessor(urls=open("../rag_urls.txt").read().splitlines(), model="intfloat/multilingual-e5-large-instruct")
-retriever = document_processor.get_retriever()
 
 # Function to create a new control flow state with the specified web search setting
 def create_control_flow(web_search_enabled=True):
@@ -154,4 +156,5 @@ async def create_chat_completion(request: ChatCompletionRequest):
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    import uvicorn
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=False)
