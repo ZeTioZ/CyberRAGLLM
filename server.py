@@ -24,35 +24,35 @@ from src.vectorstore.document_processor import DocumentProcessor
 
 # Define Pydantic models for API request and response
 class Message(BaseModel):
-    role: str
-    content: str
+	role: str
+	content: str
 
 class ChatCompletionRequest(BaseModel):
-    model: str
-    messages: List[Message]
-    temperature: Optional[float] = 0
-    max_tokens: Optional[int] = None
-    stream: Optional[bool] = False
-    max_retries: Optional[int] = 3
-    web_search_enabled: Optional[bool] = True
+	model: str
+	messages: List[Message]
+	temperature: Optional[float] = 0
+	max_tokens: Optional[int] = None
+	stream: Optional[bool] = False
+	max_retries: Optional[int] = 3
+	web_search_enabled: Optional[bool] = True
 
 class ChatCompletionChoice(BaseModel):
-    index: int
-    message: Message
-    finish_reason: str = "stop"
+	index: int
+	message: Message
+	finish_reason: str = "stop"
 
 class ChatCompletionUsage(BaseModel):
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
+	prompt_tokens: int
+	completion_tokens: int
+	total_tokens: int
 
 class ChatCompletionResponse(BaseModel):
-    id: str
-    object: str = "chat.completion"
-    created: int
-    model: str
-    choices: List[ChatCompletionChoice]
-    usage: ChatCompletionUsage
+	id: str
+	object: str = "chat.completion"
+	created: int
+	model: str
+	choices: List[ChatCompletionChoice]
+	usage: ChatCompletionUsage
 
 # Initialize shared components
 documents_urls = open("rag_urls.txt").read().splitlines()
@@ -68,93 +68,93 @@ app = FastAPI(title="CyberRAGLLM API", description="OpenAI-compatible API for Cy
 
 # Add CORS middleware
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+	CORSMiddleware,
+	allow_origins=["*"],
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
 )
 
 # Function to create a new control flow state with the specified web search setting
 def create_control_flow(web_search_enabled=True):
-    control_flow_state = ControlFlowState(llm_model, retriever, web_search_tool, web_search_enabled)
-    return control_flow_state.build_graph()
+	control_flow_state = ControlFlowState(llm_model, retriever, web_search_tool, web_search_enabled)
+	return control_flow_state.build_graph()
 
 @app.get("/")
 async def root():
-    """Root endpoint that returns basic API information."""
-    return {
-        "message": "CyberRAGLLM API is running",
-        "version": "1.0.0",
-        "endpoints": {
-            "/v1/chat/completions": "OpenAI-compatible chat completions endpoint"
-        }
-    }
+	"""Root endpoint that returns basic API information."""
+	return {
+		"message": "CyberRAGLLM API is running",
+		"version": "1.0.0",
+		"endpoints": {
+			"/v1/chat/completions": "OpenAI-compatible chat completions endpoint"
+		}
+	}
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def create_chat_completion(request: ChatCompletionRequest):
-    """
-    OpenAI-compatible chat completions endpoint.
+	"""
+	OpenAI-compatible chat completions endpoint.
 
-    This endpoint processes chat completion requests in the OpenAI API format,
-    runs them through the CyberRAGLLM graph-based workflow, and returns responses
-    in the format expected by OpenAI API clients.
-    """
-    try:
-        # Extract the question from the last user message
-        user_messages = [msg for msg in request.messages if msg.role == "user"]
-        if not user_messages:
-            raise HTTPException(status_code=400, detail="No user message found in the request")
+	This endpoint processes chat completion requests in the OpenAI API format,
+	runs them through the CyberRAGLLM graph-based workflow, and returns responses
+	in the format expected by OpenAI API clients.
+	"""
+	try:
+		# Extract the question from the last user message
+		user_messages = [msg for msg in request.messages if msg.role == "user"]
+		if not user_messages:
+			raise HTTPException(status_code=400, detail="No user message found in the request")
 
-        question = user_messages[-1].content
+		question = user_messages[-1].content
 
-        # Initialize state
-        state = {
-            "question": question,
-            "documents": [],
-            "web_search": "No",
-            "max_retries": request.max_retries,
-            "loop_step": 0,
-            "generation": "",
-            "answers": 0
-        }
+		# Initialize state
+		state = {
+			"question": question,
+			"documents": [],
+			"web_search": "No",
+			"max_retries": request.max_retries,
+			"loop_step": 0,
+			"generation": "",
+			"answers": 0
+		}
 
-        # Create a new graph with the specified web search setting
-        graph = create_control_flow(request.web_search_enabled)
+		# Create a new graph with the specified web search setting
+		graph = create_control_flow(request.web_search_enabled)
 
-        # Run the graph
-        result = graph.invoke(state)
+		# Run the graph
+		result = graph.invoke(state)
 
-        # Extract the answer
-        answer = result.get('generation', 'No answer generated.')
-        answer_content = answer.text()
+		# Extract the answer
+		answer = result.get('generation', 'No answer generated.')
+		answer_content = answer.text()
 
-        # Create response in OpenAI format
-        response = ChatCompletionResponse(
-            id=f"chatcmpl-{os.urandom(4).hex()}",
-            created=int(__import__('time').time()),
-            model=request.model,
-            choices=[
-                ChatCompletionChoice(
-                    index=0,
-                    message=Message(
-                        role="assistant",
-                        content=answer_content
-                    )
-                )
-            ],
-            usage=ChatCompletionUsage(
-                prompt_tokens=len(question),
-                completion_tokens=len(answer_content),
-                total_tokens=(len(question) + len(answer_content))
-            )
-        )
+		# Create response in OpenAI format
+		response = ChatCompletionResponse(
+			id=f"chatcmpl-{os.urandom(4).hex()}",
+			created=int(__import__('time').time()),
+			model=request.model,
+			choices=[
+				ChatCompletionChoice(
+					index=0,
+					message=Message(
+						role="assistant",
+						content=answer_content
+					)
+				)
+			],
+			usage=ChatCompletionUsage(
+				prompt_tokens=len(question),
+				completion_tokens=len(answer_content),
+				total_tokens=(len(question) + len(answer_content))
+			)
+		)
 
-        return response
+		return response
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=False)
+	import uvicorn
+	uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=False)
