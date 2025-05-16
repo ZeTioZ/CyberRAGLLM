@@ -3,9 +3,9 @@
 title: "Comparative Analysis: ZSP vs FSP + RAG"
 author: "Diego ALARCON, Donato GENTILE"
 output:
-  pdf_document: default
   html_document:
     keep_md: true
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -38,7 +38,7 @@ t(shapiro_results)
 
 # QQ Plots for visualizing normality
 metrics <- c("Correctness", "Methodology", "Reproducibility", "Quality", "Score")
-par(mfrow = c(1, 2))
+par(mfrow = c(1, 1))
 for (metric in metrics) {
   zsp <- df[[paste0(metric, "_ZSP")]]
   fsp <- df[[paste0(metric, "_FSP_RAG")]]
