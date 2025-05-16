@@ -140,7 +140,7 @@ def sanitize_query(query: str) -> str:
 	Sanitize a query string to be compatible with Tavily Search.
 
 	This method only sanitizes special characters that might cause issues with the Tavily API,
-	preserving code blocks and other content.
+	preserving code blocks and other content. The query is also truncated to a maximum length of 400 characters.
 
 	Args:
 		query (str): The original query string.
@@ -152,8 +152,8 @@ def sanitize_query(query: str) -> str:
 	query = re.sub(r'[<>{}[\]\\|;`]', ' ', query)
 
 	# Limit query length
-	if len(query) > 1000:
-		query = query[:997] + "..."
+	if len(query) >= 400:
+		query = query[:390] + "..."
 
 	return query
 
@@ -240,7 +240,10 @@ class ControlFlowState:
 
 		# Score each doc
 		filtered_docs = []
-		web_search = "No"
+		if len(documents) == 0:
+			print("No documents found, running web search")
+			return {"documents": [], "web_search": "yes"}
+		web_search = "no"
 		for d in documents:
 			doc_grader_prompt_formatted = DOC_GRADER_PROMPT.format(
 				document=d.page_content, question=question
