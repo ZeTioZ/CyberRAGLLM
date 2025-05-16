@@ -1,6 +1,6 @@
 
 ---
-title: "Analyse Comparative : ZSP vs FSP + RAG"
+title: "Comparative Analysis: ZSP vs FSP + RAG"
 author: "Diego ALARCON, Donato GENTILE"
 output:
   pdf_document: default
@@ -15,32 +15,43 @@ library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(ggpubr)
+library(reshape2)
 ```
 
-## 1. Chargement et préparation des données
+## 1. Data Loading and Preparation
 
 ```{r}
-df <- read_csv2("D:\\Téléchargements\\Documents\\LLM_Benchmarks.csv")
+df <- read_csv2(".\\LLM_Benchmarks.csv")
 ```
 
-## 2. Tests de normalité (Shapiro-Wilk)
-
+## 2. Normality Tests (Shapiro-Wilk)
 ```{r}
-shapiro_results <- sapply(c("Exactitude", "Methodologie", "Reproductibilite", "Qualite",
+shapiro_results <- sapply(c("Correctness", "Methodology", "Reproducibility", "Quality",
  "Score"), function(metric) {
   zsp <- df[[paste0(metric, "_ZSP")]]
   fsp <- df[[paste0(metric, "_FSP_RAG")]]
   p_zsp <- shapiro.test(zsp)$p.value
   p_fsp <- shapiro.test(fsp)$p.value
-  c(ZSP = p_zsp, FSP_RAG = p_fsp)
+  c(ZSP_P_VALUE = p_zsp, FSP_RAG_P_VALUE = p_fsp)
 })
 t(shapiro_results)
+
+# QQ Plots for visualizing normality
+metrics <- c("Correctness", "Methodology", "Reproducibility", "Quality", "Score")
+par(mfrow = c(1, 2))
+for (metric in metrics) {
+  zsp <- df[[paste0(metric, "_ZSP")]]
+  fsp <- df[[paste0(metric, "_FSP_RAG")]]
+  qqnorm(zsp, main = paste("QQ Plot ZSP -", metric)); qqline(zsp)
+  qqnorm(fsp, main = paste("QQ Plot FSP + RAG -", metric)); qqline(fsp)
+}
+par(mfrow = c(1, 1))
 ```
 
-## 3. Tests d'hypothèse (t-test ou Wilcoxon apparié)
+## 3. Hypothesis Testing (Paired t-test or Wilcoxon)
 
 ```{r}
-test_results <- lapply(c("Exactitude", "Methodologie", "Reproductibilite", "Qualite",
+test_results <- lapply(c("Correctness", "Methodology", "Reproducibility", "Quality",
  "Score"), function(metric) {
   zsp <- df[[paste0(metric, "_ZSP")]]
   fsp <- df[[paste0(metric, "_FSP_RAG")]]
@@ -54,18 +65,44 @@ test_results <- lapply(c("Exactitude", "Methodologie", "Reproductibilite", "Qual
 do.call(rbind, test_results)
 ```
 
-• H0 (p-value >= 0.05) : Les scores moyens avec ZSP sont supérieurs ou égaux à ceux avec FSP+RAG.
+• H0 (p-value >= 0.05): The mean scores with ZSP are greater than or equal to those with FSP+RAG.
 
-• H1 (p-value < 0.05) : Les scores moyens avec ZSP sont inférieurs à ceux avec FSP+RAG (donc FSP+RAG est supérieur).
+• H1 (p-value < 0.05): The mean scores with ZSP are lower than those with FSP+RAG (meaning FSP+RAG is superior).
 
-## 4. Visualisation : Boxplots comparatifs
+## 4. Visualization: Comparative Boxplots
 
 ```{r}
+# Visualize ranks for Wilcoxon test
+ranks_plot_data <- lapply(metrics, function(metric) {
+  zsp <- df[[paste0(metric, "_ZSP")]]
+  fsp <- df[[paste0(metric, "_FSP_RAG")]]
+  if (shapiro.test(zsp)$p.value <= 0.05 || shapiro.test(fsp)$p.value <= 0.05) {
+    diff <- zsp - fsp
+    signed_ranks <- rank(abs(diff)) * sign(diff)
+    data.frame(Subject = seq_along(diff), SignedRank = signed_ranks, Metric = metric)
+  }
+}) %>% bind_rows()
+
+ggplot(ranks_plot_data, aes(x = factor(Subject), y = SignedRank, fill = Metric)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  facet_wrap(~ Metric, scales = "free_y") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),  # Hides x-axis labels
+    axis.ticks.x = element_blank(), # Removes x-axis ticks
+    plot.title = element_text(hjust = 0.5)
+  ) +
+  labs(
+    title = "Signed Ranks for Wilcoxon Test (ZSP - FSP + RAG)",
+    x = NULL,
+    y = "Signed Rank"
+  )
+
 df_long <- df %>%
-  select(Exactitude_ZSP, Exactitude_FSP_RAG,
-         Methodologie_ZSP, Methodologie_FSP_RAG,
-         Reproductibilite_ZSP, Reproductibilite_FSP_RAG,
-         Qualite_ZSP, Qualite_FSP_RAG,
+  select(Correctness_ZSP, Correctness_FSP_RAG,
+         Methodology_ZSP, Methodology_FSP_RAG,
+         Reproducibility_ZSP, Reproducibility_FSP_RAG,
+         Quality_ZSP, Quality_FSP_RAG,
          Score_ZSP, Score_FSP_RAG) %>%
   pivot_longer(cols = everything(),
                names_to = c("Metric", "Type"),
@@ -74,17 +111,18 @@ df_long <- df %>%
 
 ggplot(df_long, aes(x = Type, y = Value, fill = Type)) +
   geom_boxplot(alpha = 0.6, outlier.shape = NA) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 5, color = "white", position = position_dodge(width = 0.75)) +
   geom_jitter(width = 0.2, alpha = 0.4) +
   facet_wrap(~ Metric, scales = "free_y") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5)) +
-  labs(title = "Comparaison des scores entre ZSP et FSP + RAG - Global")
+  labs(title = "Comparison between ZSP and FSP + RAG - Global")
 ```
 
-## 5. Analyse par Niveau
+## 5. Analysis by Level
 
 ```{r}
-# Regroupement par niveau et calcul de la moyenne par métrique
+# Grouping by level and calculating the mean per metric
 df$Level <- df$Level_ZSP
 df_by_level <- df %>%
   group_by(Level) %>%
@@ -92,11 +130,11 @@ df_by_level <- df %>%
             across(ends_with("FSP_RAG"), mean, na.rm = TRUE))
 
 # Transformation des données pour la visualisation
-niveaux <- sort(unique(df$Level))
+levels <- sort(unique(df$Level))
 
 get_tests_by_level <- function(niveau) {
   sous_df <- df %>% filter(Level == niveau)
-  results <- lapply(c("Exactitude", "Methodologie", "Reproductibilite", "Qualite",
+  results <- lapply(c("Correctness", "Methodology", "Reproducibility", "Quality",
    "Score"), function(metric) {
     zsp <- sous_df[[paste0(metric, "_ZSP")]]
     fsp <- sous_df[[paste0(metric, "_FSP_RAG")]]
@@ -110,25 +148,25 @@ get_tests_by_level <- function(niveau) {
   do.call(rbind, results)
 }
 
-tests_par_niveau <- lapply(niveaux, get_tests_by_level)
-names(tests_par_niveau) <- paste("Niveau", niveaux)
+tests_by_level <- lapply(levels, get_tests_by_level)
+names(tests_by_level) <- paste("Level", levels)
 
-tests_par_niveau
+tests_by_level
 ```
-• H0 (p-value >= 0.05) : Les scores moyens avec ZSP sont supérieurs ou égaux à ceux avec FSP+RAG.
+• H0 (p-value >= 0.05): The mean scores with ZSP are greater than or equal to those with FSP+RAG.
 
-• H1 (p-value < 0.05) : Les scores moyens avec ZSP sont inférieurs à ceux avec FSP+RAG (donc FSP+RAG est supérieur).
+• H1 (p-value < 0.05): The mean scores with ZSP are lower than those with FSP+RAG (meaning FSP+RAG is superior).
 
-## 6. Visualisations séparées par Niveau
+## 6. Visualizations by Level
 
 ```{r}
-for (niveau in niveaux) {
+for (level in levels) {
   sous_df <- df %>%
-    filter(Level == niveau) %>%
-    select(Exactitude_ZSP, Exactitude_FSP_RAG,
-           Methodologie_ZSP, Methodologie_FSP_RAG,
-           Reproductibilite_ZSP, Reproductibilite_FSP_RAG,
-           Qualite_ZSP, Qualite_FSP_RAG,
+    filter(Level == level) %>%
+    select(Correctness_ZSP, Correctness_FSP_RAG,
+           Methodology_ZSP, Methodology_FSP_RAG,
+           Reproducibility_ZSP, Reproducibility_FSP_RAG,
+           Quality_ZSP, Quality_FSP_RAG,
            Score_ZSP, Score_FSP_RAG) %>%
     pivot_longer(cols = everything(),
                  names_to = c("Metric", "Type"),
@@ -138,11 +176,12 @@ for (niveau in niveaux) {
   print(
     ggplot(sous_df, aes(x = Type, y = Value, fill = Type)) +
       geom_boxplot(alpha = 0.6, outlier.shape = NA) +
+      stat_summary(fun = mean, geom = "point", shape = 18, size = 5, color = "white", position = position_dodge(width = 0.75)) +
       geom_jitter(width = 0.2, alpha = 0.4) +
       facet_wrap(~ Metric, scales = "free_y") +
       theme_minimal() +
       theme(plot.title = element_text(hjust = 0.5)) +
-      labs(title = paste("Comparaison ZSP vs FSP + RAG - Niveau", niveau))
+      labs(title = paste("Comparison between ZSP and FSP + RAG - By Level", level))
   )
 }
 ```

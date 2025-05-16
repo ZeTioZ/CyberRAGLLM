@@ -1,4 +1,4 @@
-﻿Level_ZSP;Exactitude_ZSP;Methodologie_ZSP;Reproductibilite_ZSP;Qualite_ZSP;Score_ZSP;Level_FSP_RAG;Exactitude_FSP_RAG;Methodologie_FSP_RAG;Reproductibilite_FSP_RAG;Qualite_FSP_RAG;Score_FSP_RAG;Level_DIFF;Exactitude_DIFF;Methodologie_DIFF;Reproductibilite_DIFF;Qualite_DIFF;Score_DIFF
+﻿Level_ZSP;Correctness_ZSP;Methodology_ZSP;Reproducibility_ZSP;Quality_ZSP;Score_ZSP;Level_FSP_RAG;Correctness_FSP_RAG;Methodology_FSP_RAG;Reproducibility_FSP_RAG;Quality_FSP_RAG;Score_FSP_RAG;Level_DIFF;Correctness_DIFF;Methodology_DIFF;Reproducibility_DIFF;Quality_DIFF;Score_DIFF
 1;10;5;5;5;10;1;10;5;5;5;10;1;0;0;0;0;0
 1;10;4;4;5;9,1;1;10;5;5;5;10;1;0;1;1;0;0,9
 1;8;5;4;4;8,5;1;10;5;5;5;10;1;2;0;1;1;1,5
