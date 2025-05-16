@@ -1,22 +1,10 @@
-
----
-title: "Comparative Analysis: ZSP vs FSP + RAG"
-author: "Diego ALARCON, Donato GENTILE"
-output:
-  html_document:
-    keep_md: true
-  pdf_document: default
----
-
-
+# Comparative Analysis: ZSP vs FSP + RAG
 
 ## 1. Data Loading and Preparation
-
 
 ``` r
 df <- read_csv2(".\\LLM_Benchmarks.csv")
 ```
-
 ## 2. Normality Tests (Shapiro-Wilk)
 
 ``` r
@@ -60,7 +48,6 @@ par(mfrow = c(1, 1))
 
 ## 3. Hypothesis Testing (Paired t-test or Wilcoxon)
 
-
 ``` r
 test_results <- lapply(c("Correctness", "Methodology", "Reproducibility", "Quality",
  "Score"), function(metric) {
@@ -90,7 +77,6 @@ do.call(rbind, test_results)
 • H1 (p-value < 0.05): The mean scores with ZSP are lower than those with FSP+RAG (meaning FSP+RAG is superior).
 
 ## 4. Visualization: Comparative Boxplots
-
 
 ``` r
 # Visualize ranks for Wilcoxon test
@@ -147,7 +133,6 @@ ggplot(df_long, aes(x = Type, y = Value, fill = Type)) +
 ![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-4-2.png)<!-- -->
 
 ## 5. Analysis by Level
-
 
 ``` r
 # Grouping by level and calculating the mean per metric
@@ -220,7 +205,6 @@ tests_by_level
 • H1 (p-value < 0.05): The mean scores with ZSP are lower than those with FSP+RAG (meaning FSP+RAG is superior).
 
 ## 6. Visualizations by Level
-
 
 ``` r
 for (level in levels) {
