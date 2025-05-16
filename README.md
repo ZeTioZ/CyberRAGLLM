@@ -124,10 +124,10 @@ You can enable or disable web searches completely:
    ```
 
 2. **Benefits of Disabling Web Search**:
-   - Privacy and security when dealing with sensitive information
-   - Offline mode for environments without internet access
-   - Controlled information to ensure answers are based only on vetted documents
-   - Testing and evaluation to compare answer quality with and without web search
+	- Privacy and security when dealing with sensitive information
+	- Offline mode for environments without internet access
+	- Controlled information to ensure answers are based only on vetted documents
+	- Testing and evaluation to compare answer quality with and without web search
 
 ## System Architecture
 
@@ -145,14 +145,14 @@ CyberRAGLLM uses a graph-based workflow with the following components:
 - Python 3.8+
 - Ollama with a compatible local LLM model (e.g., Llama 3.2)
 - Dependencies:
-  - langchain, langchain_core, langchain_community
-  - langchain_ollama
-  - langgraph
-  - scikit-learn
-  - tiktoken
-  - tavily-python
-  - beautifulsoup4 (BeautifulSoup)
-  - pypdf (for PDF processing)
+	- langchain, langchain_core, langchain_community
+	- langchain_ollama
+	- langgraph
+	- scikit-learn
+	- tiktoken
+	- tavily-python
+	- beautifulsoup4 (BeautifulSoup)
+	- pypdf (for PDF processing)
 - Tavily API key for web search functionality
 - LangSmith API key for tracing (optional)
 - Sufficient RAM for embedding and running the LLM

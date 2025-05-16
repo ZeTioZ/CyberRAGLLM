@@ -92,15 +92,15 @@ import requests
 API_URL = "http://localhost:8000/v1/chat/completions"
 
 request_data = {
-    "model": "hf.co/safe049/mistral-v0.3-7b-cybersecurity:latest",
-    "messages": [
-        {
-            "role": "user",
-            "content": "What are the most common cybersecurity threats?"
-        }
-    ],
-    "temperature": 0,
-    "max_retries": 3
+	"model": "hf.co/safe049/mistral-v0.3-7b-cybersecurity:latest",
+	"messages": [
+		{
+			"role": "user",
+			"content": "What are the most common cybersecurity threats?"
+		}
+	],
+	"temperature": 0,
+	"max_retries": 3
 }
 
 response = requests.post(API_URL, json=request_data)
@@ -135,15 +135,15 @@ Since the API is designed to be compatible with OpenAI's API, you can use OpenAI
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="dummy-key",  # Not used but required
-    base_url="http://localhost:8000/v1"  # Point to your local server
+	api_key="dummy-key",  # Not used but required
+	base_url="http://localhost:8000/v1"  # Point to your local server
 )
 
 response = client.chat.completions.create(
-    model="hf.co/safe049/mistral-v0.3-7b-cybersecurity:latest",
-    messages=[
-        {"role": "user", "content": "What are the most common cybersecurity threats?"}
-    ]
+	model="hf.co/safe049/mistral-v0.3-7b-cybersecurity:latest",
+	messages=[
+		{"role": "user", "content": "What are the most common cybersecurity threats?"}
+	]
 )
 
 print(response.choices[0].message.content)
