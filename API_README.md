@@ -15,15 +15,10 @@ CyberRAGLLM is a graph-based workflow application that answers cybersecurity que
 
 2. Start the API server:
    ```
-   python server.py
+   python -m uvicorn server:app
    ```
 
    The server will start on `http://localhost:8000` by default.
-
-3. (Optional) Test the API:
-   ```
-   python test_api.py
-   ```
 
 ## API Endpoints
 

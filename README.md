@@ -41,7 +41,7 @@ pip install -r requirements.txt
 ```bash
 # Install Ollama from https://ollama.ai/
 # Then pull the model
-ollama pull llama3.2:3b-instruct-fp16
+ollama pull hf.co/safe049/mistral-v0.3-7b-cybersecurity:latest
 ```
 
 5. Set up your API keys:
