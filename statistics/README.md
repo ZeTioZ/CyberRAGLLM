@@ -5,6 +5,7 @@
 ``` r
 df <- read_csv2(".\\LLM_Benchmarks.csv")
 ```
+
 ## 2. Normality Tests (Shapiro-Wilk)
 
 ``` r
@@ -31,7 +32,7 @@ t(shapiro_results)
 ``` r
 # QQ Plots for visualizing normality
 metrics <- c("Correctness", "Methodology", "Reproducibility", "Quality", "Score")
-par(mfrow = c(1, 2))
+par(mfrow = c(1, 1))
 for (metric in metrics) {
   zsp <- df[[paste0(metric, "_ZSP")]]
   fsp <- df[[paste0(metric, "_FSP_RAG")]]
@@ -40,7 +41,7 @@ for (metric in metrics) {
 }
 ```
 
-![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-1.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-2.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-3.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-4.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-5.png)<!-- -->
+![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-1.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-2.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-3.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-4.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-5.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-6.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-7.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-8.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-9.png)<!-- -->![](Analyse_ZSP_vs_FSP_RAG_files/figure-html/unnamed-chunk-2-10.png)<!-- -->
 
 ``` r
 par(mfrow = c(1, 1))
